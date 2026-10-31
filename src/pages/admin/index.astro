@@ -1,0 +1,326 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { config } from '../../lib/config';
+---
+<BaseLayout title="Admin" noindex>
+  <section class="admin-shell">
+    <h1>Blog admin</h1>
+    <form id="login-form">
+      <label for="password">Admin password</label>
+      <input id="password" type="password" autocomplete="current-password" required />
+      <button type="submit">Sign in</button>
+      <p id="login-status" role="status"></p>
+    </form>
+    <section id="editor" hidden data-author={config.author}>
+      <div class="post-neighbors"><h2>Posts</h2><button id="new-post" type="button">New draft</button><button id="sign-out" type="button">Sign out</button></div>
+      <p id="admin-status" role="status"></p>
+      <ul id="post-list"></ul>
+      <form id="post-form">
+        <input type="hidden" name="id" />
+        <label>Title<input name="title" required maxlength="200" /></label>
+        <label>Slug<input name="slug" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label>
+        <label>Excerpt<input name="excerpt" maxlength="300" /></label>
+        <label>Tags (comma-separated)<input name="tags" /></label>
+        <fieldset class="image-generator">
+          <legend>Generate an illustration with Ideogram</legend>
+          <label for="image-generation-prompt">Image prompt<textarea id="image-generation-prompt" maxlength="1000" rows="3" placeholder="Describe the illustration for this post"></textarea></label>
+          <label for="image-generation-alt">Descriptive alt text<input id="image-generation-alt" maxlength="300" placeholder="Describe what readers should know about the image" /></label>
+          <small>Each request generates one 1K image and may use Ideogram API credits.</small>
+          <button id="generate-image" type="button">Generate image</button>
+          <p id="image-generation-status" role="status" aria-live="polite"></p>
+          <div id="generated-image-result" hidden>
+            <img id="generated-image-preview" alt="" />
+            <div class="post-neighbors">
+              <button id="use-generated-hero" type="button">Use as hero image</button>
+              <button id="insert-generated-inline" type="button">Insert into post</button>
+            </div>
+          </div>
+        </fieldset>
+        <label>Hero image URL<input name="hero_image_url" type="url" /></label>
+        <label>Upload hero image<input id="hero-image-upload" type="file" accept="image/jpeg,image/png,image/webp,image/avif" /></label>
+        <label>Hero image alt text<input name="hero_image_alt" /></label>
+        <label>Schedule for (optional)<input name="publish_at" type="datetime-local" /></label>
+        <label>Narration override (optional)<textarea name="narration_override"></textarea></label>
+        <div class="markdown-editor">
+          <label>Markdown body<textarea name="body_md" required></textarea></label>
+          <div><strong>Live preview</strong><div id="markdown-preview" class="article-body preview-body"></div></div>
+        </div>
+        <div>
+          <strong>Narration preview</strong>
+          <p id="narration-preview"></p>
+          <small id="narration-count"></small>
+        </div>
+        <button type="submit">Save draft</button>
+        <button id="publish-now" type="button">Publish now</button>
+        <button id="schedule-post" type="button">Schedule</button>
+        <button id="publish-without-audio" type="button">Publish without audio</button>
+        <button id="retry-audio" type="button">Retry narration</button>
+      </form>
+    </section>
+  </section>
+  <script>
+    import { marked } from 'marked';
+    import DOMPurify from 'dompurify';
+    import { narrationText } from '../../lib/narration-text';
+
+    const login = document.querySelector<HTMLFormElement>('#login-form')!;
+    const editor = document.querySelector<HTMLElement>('#editor')!;
+    const form = document.querySelector<HTMLFormElement>('#post-form')!;
+    const status = document.querySelector<HTMLElement>('#admin-status')!;
+    const postList = document.querySelector<HTMLElement>('#post-list')!;
+    const imagePrompt = document.querySelector<HTMLTextAreaElement>('#image-generation-prompt')!;
+    const imageAlt = document.querySelector<HTMLInputElement>('#image-generation-alt')!;
+    const imageGenerationStatus = document.querySelector<HTMLElement>('#image-generation-status')!;
+    const generatedImageResult = document.querySelector<HTMLElement>('#generated-image-result')!;
+    const generatedImagePreview = document.querySelector<HTMLImageElement>('#generated-image-preview')!;
+    let generatedImageUrl = '';
+    let currentId: number | null = null;
+    let currentStatus = '';
+    async function request(path: string, init?: RequestInit) {
+      const response = await fetch(`/.netlify/functions/${path}`, { credentials: 'same-origin', ...init, headers: { 'Content-Type': 'application/json', ...init?.headers } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error?.message || 'Request failed');
+      return data;
+    }
+    document.querySelector<HTMLInputElement>('#hero-image-upload')?.addEventListener('change', async (event) => {
+      const file = (event.currentTarget as HTMLInputElement).files?.[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { status.textContent = 'Image must be 5 MB or smaller.'; return; }
+      const data = new FormData();
+      data.set('file', file);
+      try {
+        const response = await fetch('/.netlify/functions/upload-image', { method: 'POST', credentials: 'same-origin', body: data });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error?.message || 'Image upload failed.');
+        (form.elements.namedItem('hero_image_url') as HTMLInputElement).value = new URL(result.url, location.origin).toString();
+        status.textContent = 'Image uploaded. Add descriptive alt text before publishing.';
+      } catch (error) { status.textContent = error instanceof Error ? error.message : 'Image upload failed.'; }
+    });
+    document.querySelector<HTMLButtonElement>('#generate-image')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      const prompt = imagePrompt.value.trim();
+      if (!prompt || prompt.length > 1000) {
+        imageGenerationStatus.textContent = 'Enter an image prompt of 1–1,000 characters.';
+        return;
+      }
+      button.disabled = true;
+      generatedImageResult.hidden = true;
+      imageGenerationStatus.textContent = 'Starting image generation…';
+      try {
+        const started = await request('generate-image', { method: 'POST', body: JSON.stringify({ prompt }) });
+        const generationId = String(started.generationId || '');
+        if (!generationId) throw new Error('Ideogram did not return a generation identifier.');
+        imageGenerationStatus.textContent = 'Generating image…';
+        for (let attempt = 0; attempt < 120; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          const result = await request(`generate-image?generationId=${encodeURIComponent(generationId)}`);
+          if (result.status === 'ready' && typeof result.url === 'string') {
+            generatedImageUrl = new URL(result.url, location.origin).toString();
+            generatedImagePreview.src = generatedImageUrl;
+            generatedImageResult.hidden = false;
+            imageGenerationStatus.textContent = 'Image ready. Add descriptive alt text, then assign it to the hero or insert it into the post.';
+            return;
+          }
+          if (result.status !== 'pending') throw new Error('Ideogram returned an unknown generation status.');
+          imageGenerationStatus.textContent = `Generating image… (${attempt + 1})`;
+          const retryAfter = Number(result.retryAfterSeconds);
+          if (Number.isFinite(retryAfter) && retryAfter > 3) await new Promise((resolve) => setTimeout(resolve, Math.min(retryAfter, 30) * 1000 - 3000));
+        }
+        throw new Error('Image generation is taking longer than expected. Try checking again later.');
+      } catch (error) {
+        imageGenerationStatus.textContent = error instanceof Error ? error.message : 'Image generation failed.';
+      } finally {
+        button.disabled = false;
+      }
+    });
+    document.querySelector<HTMLButtonElement>('#use-generated-hero')?.addEventListener('click', () => {
+      if (!generatedImageUrl) return;
+      if (!imageAlt.value.trim()) {
+        imageGenerationStatus.textContent = 'Add descriptive alt text before assigning this image.';
+        imageAlt.focus();
+        return;
+      }
+      (form.elements.namedItem('hero_image_url') as HTMLInputElement).value = generatedImageUrl;
+      (form.elements.namedItem('hero_image_alt') as HTMLInputElement).value = imageAlt.value.trim();
+      (form.elements.namedItem('hero_image_url') as HTMLInputElement).dispatchEvent(new Event('input', { bubbles: true }));
+      imageGenerationStatus.textContent = 'Generated image assigned as the hero image.';
+    });
+    document.querySelector<HTMLButtonElement>('#insert-generated-inline')?.addEventListener('click', () => {
+      if (!generatedImageUrl) return;
+      const alt = imageAlt.value.trim();
+      if (!alt) {
+        imageGenerationStatus.textContent = 'Add descriptive alt text before inserting this image.';
+        imageAlt.focus();
+        return;
+      }
+      const body = form.elements.namedItem('body_md') as HTMLTextAreaElement;
+      const markdown = `![${alt.replace(/]/g, '\\]')}](${generatedImageUrl})`;
+      body.value = `${body.value.trimEnd()}\n\n${markdown}\n`;
+      body.dispatchEvent(new Event('input', { bubbles: true }));
+      imageGenerationStatus.textContent = 'Generated image inserted into the post. Save the draft to keep it.';
+    });
+    async function loadPosts() {
+      const data = await request('posts');
+      postList.replaceChildren();
+      for (const post of data.posts) {
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = `${post.title} — ${post.status}`;
+        button.addEventListener('click', () => fill(post));
+        li.append(button);
+        postList.append(li);
+      }
+    }
+    function fill(post: Record<string, unknown>) {
+      currentId = Number(post.id);
+      currentStatus = String(post.status || '');
+      (form.querySelector('[type="submit"]') as HTMLButtonElement).textContent = currentStatus === 'published' ? 'Save changes' : 'Save draft';
+      for (const [key, value] of Object.entries(post)) {
+        const input = form.elements.namedItem(key) as HTMLInputElement | HTMLTextAreaElement | null;
+        if (key === 'tags' && Array.isArray(value)) {
+          (form.elements.namedItem('tags') as HTMLInputElement).value = value.map((tag) => (tag as { name: string }).name).join(', ');
+        } else if (input && 'value' in input) {
+          if (key === 'publish_at' && value) {
+            const date = new Date(String(value));
+            date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+            input.value = date.toISOString().slice(0, 16);
+          } else input.value = String(value ?? '');
+        }
+      }
+      updatePreview();
+      const audio = post.audio as { status?: string; error?: string } | null;
+      if (audio?.status === 'failed') status.textContent = `Narration failed: ${audio.error || 'Unknown error'}. Retry narration or publish without audio.`;
+    }
+    function updatePreview() {
+      const data = new FormData(form);
+      const text = narrationText(
+        String(data.get('title') || 'Untitled'),
+        editor.dataset.author || 'Blog author',
+        String(data.get('body_md') || ''),
+        String(data.get('narration_override') || ''),
+      );
+      document.querySelector('#narration-preview')!.textContent = text;
+      document.querySelector('#narration-count')!.textContent = `${text.length} characters; approximately the same number of ElevenLabs credits (plan-dependent). 40,000 character maximum.`;
+      void renderPreview(String(data.get('body_md') || ''));
+    }
+    async function renderPreview(markdown: string) {
+      const html = await marked.parse(markdown);
+      document.querySelector('#markdown-preview')!.innerHTML = DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'em', 'strong', 'del', 'a', 'img', 'hr', 'br'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class'],
+      });
+    }
+    login.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        await request('auth-login', { method: 'POST', body: JSON.stringify({ password: (document.querySelector('#password') as HTMLInputElement).value }) });
+        login.hidden = true;
+        editor.hidden = false;
+        await loadPosts();
+      } catch (error) {
+        document.querySelector('#login-status')!.textContent = error instanceof Error ? error.message : 'Login failed';
+      }
+    });
+    void loadPosts().then(() => { login.hidden = true; editor.hidden = false; }).catch((error: unknown) => {
+      if (!(error instanceof Error) || error.message !== 'Sign in to manage posts.') {
+        document.querySelector('#login-status')!.textContent = error instanceof Error ? error.message : 'Unable to load admin.';
+      }
+    });
+    document.querySelector('#new-post')?.addEventListener('click', () => {
+      currentId = null;
+      currentStatus = 'draft';
+      (form.querySelector('[type="submit"]') as HTMLButtonElement).textContent = 'Save draft';
+      form.reset();
+      status.textContent = 'New draft';
+      updatePreview();
+    });
+    document.querySelector('#sign-out')?.addEventListener('click', async () => {
+      try {
+        await request('auth-logout', { method: 'POST', body: '{}' });
+        editor.hidden = true;
+        login.hidden = false;
+        status.textContent = '';
+      } catch (error) { status.textContent = error instanceof Error ? error.message : 'Sign out failed'; }
+    });
+    form.addEventListener('input', () => {
+      updatePreview();
+      status.textContent = 'Unsaved changes';
+    });
+    let saveTimer: ReturnType<typeof setTimeout>;
+    form.addEventListener('input', () => {
+      if (currentStatus === 'published') return;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => { void saveDraft(); }, 5000);
+    });
+    async function saveDraft(rebuildPublished = false): Promise<boolean> {
+      if (!(form.elements.namedItem('title') as HTMLInputElement).value.trim()) return false;
+      try {
+        const values = Object.fromEntries(new FormData(form));
+        delete values.publish_at;
+        if (!currentId) delete values.id;
+        const method = currentId ? 'PUT' : 'POST';
+        if (currentId) values.id = String(currentId);
+        const data = await request(rebuildPublished ? 'posts?rebuild=1' : 'posts', { method, body: JSON.stringify(values) });
+        currentId = data.post.id;
+        currentStatus = String(data.post.status || 'draft');
+        (form.querySelector('[type="submit"]') as HTMLButtonElement).textContent = currentStatus === 'published' ? 'Save changes' : 'Save draft';
+        (form.elements.namedItem('slug') as HTMLInputElement).value = data.post.slug;
+        (form.elements.namedItem('id') as HTMLInputElement).value = String(currentId);
+        status.textContent = data.warning || 'Saved';
+        await loadPosts();
+        return true;
+      } catch (error) { status.textContent = error instanceof Error ? error.message : 'Could not save'; }
+      return false;
+    }
+    form.addEventListener('submit', (event) => { event.preventDefault(); void saveDraft(true); });
+    document.querySelector('#publish-now')?.addEventListener('click', async () => {
+      if (!(await saveDraft())) return;
+      if (!currentId) return;
+      try {
+        await request('publish', { method: 'POST', body: JSON.stringify({ postId: currentId }) });
+        status.textContent = 'Publishing — audio generation may take a few minutes.';
+        const timer = setInterval(async () => {
+          try {
+            const data = await request(`posts?id=${currentId}`);
+            if (data.post.status !== 'publishing') {
+              clearInterval(timer);
+              status.textContent = data.post.audio?.status === 'failed'
+                ? `Narration failed: ${data.post.audio.error || 'Unknown error'}. Retry narration or publish without audio.`
+                : `Status: ${data.post.status}`;
+              fill(data.post);
+              await loadPosts();
+            }
+          } catch { clearInterval(timer); }
+        }, 3000);
+      } catch (error) { status.textContent = error instanceof Error ? error.message : 'Publishing failed'; }
+    });
+    document.querySelector('#schedule-post')?.addEventListener('click', async () => {
+      if (!(await saveDraft())) return;
+      const publishAt = (form.elements.namedItem('publish_at') as HTMLInputElement).value;
+      if (!currentId || !publishAt) { status.textContent = 'Choose a future schedule time first.'; return; }
+      try {
+        await request('publish', { method: 'POST', body: JSON.stringify({ postId: currentId, publishAt: new Date(publishAt).toISOString() }) });
+        status.textContent = 'Scheduled.';
+        await loadPosts();
+      } catch (error) { status.textContent = error instanceof Error ? error.message : 'Scheduling failed'; }
+    });
+    document.querySelector('#publish-without-audio')?.addEventListener('click', async () => {
+      if (!(await saveDraft())) return;
+      if (!currentId || !confirm('Publish this post without audio?')) return;
+      try {
+        await request('publish', { method: 'POST', body: JSON.stringify({ postId: currentId, withoutAudio: true }) });
+        status.textContent = 'Published without audio.';
+        await loadPosts();
+      } catch (error) { status.textContent = error instanceof Error ? error.message : 'Publishing failed'; }
+    });
+    document.querySelector('#retry-audio')?.addEventListener('click', async () => {
+      if (!(await saveDraft())) return;
+      if (!currentId) return;
+      try {
+        await request('publish', { method: 'POST', body: JSON.stringify({ postId: currentId }) });
+        status.textContent = 'Narration retry started.';
+      } catch (error) { status.textContent = error instanceof Error ? error.message : 'Retry failed'; }
+    });
+  </script>
+</BaseLayout>

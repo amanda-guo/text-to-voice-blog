@@ -1,0 +1,105 @@
+{
+  "version": 4,
+  "project": {
+    "catalog": "prod",
+    "initializedAt": "2026-10-31T00:02:47.602Z",
+    "merchantDisplayName": null,
+    "merchantId": "acct_1UWP8IQsUD09EGUI",
+    "projectId": "project_61VfniJq0Nx63GYpY16Vfn5fHFA8yHCiDAKhU26IqMci",
+    "projectName": "Stripe Projects"
+  },
+  "providers": {
+    "elevenlabs": {
+      "accountRequestId": "facctrq_61Vfnwhe5nuYU3klI16Vfn5fHFA8yHCiDAKhU26Iq4w4",
+      "configuration": {},
+      "linkedAt": "2026-10-31T00:17:45.277Z",
+      "providerId": "prvdr_61UYtnmm5DvySq8Ol56tE",
+      "providerName": "ElevenLabs",
+      "redirectUrl": null,
+      "requestedAt": "2026-10-31T00:17:45.277Z",
+      "status": "complete"
+    },
+    "netlify": {
+      "accountRequestId": "facctrq_61VfnwRggxfshuLco16Vfn5fHFA8yHCiDAKhU26IqWb2",
+      "configuration": {},
+      "linkedAt": "2026-10-31T00:17:24.903Z",
+      "providerId": "prvdr_61UXju1taz9UCvkk95GEK",
+      "providerName": "Netlify",
+      "redirectUrl": null,
+      "requestedAt": "2026-10-31T00:17:24.903Z",
+      "status": "complete"
+    },
+    "turso": {
+      "accountRequestId": "facctrq_61VfnvgCTVCmT5CCG16Vfn5fHFA8yHCiDAKhU26IqHrU",
+      "configuration": {},
+      "linkedAt": "2026-10-31T00:16:37.627Z",
+      "providerId": "prvdr_61UGLtrGjcXK8rTq15RWq",
+      "providerName": "Turso",
+      "redirectUrl": null,
+      "requestedAt": "2026-10-31T00:16:37.626Z",
+      "status": "complete"
+    }
+  },
+  "resources": {
+    "turso-plan": {
+      "configuration": {},
+      "createdAt": "2026-10-31T00:16:45.029Z",
+      "lastRevealedAt": "2026-10-31T00:16:46.243Z",
+      "lastStatus": "complete",
+      "livemode": true,
+      "name": "turso-plan",
+      "providerId": "prvdr_61UGLtrGjcXK8rTq15RWq",
+      "providerName": "Turso",
+      "resourceId": "fres_61VfnvjSThbq13v1p16Vfn5fHFA8yHCiDAKhU26Iq3Fg",
+      "serviceId": "starter"
+    },
+    "voice-blog-db": {
+      "configuration": {
+        "name": "voice-blog",
+        "location": "aws-us-east-2"
+      },
+      "createdAt": "2026-10-31T00:17:09.484Z",
+      "lastRevealedAt": "2026-10-31T00:17:10.556Z",
+      "lastStatus": "complete",
+      "livemode": true,
+      "name": "voice-blog-db",
+      "providerId": "prvdr_61UGLtrGjcXK8rTq15RWq",
+      "providerName": "Turso",
+      "resourceId": "fres_61VfnwBLwU6tmON4V16Vfn5fHFA8yHCiDAKhU26IqVtQ",
+      "serviceId": "database"
+    },
+    "voice-blog-site": {
+      "configuration": {
+        "name": "voice-narrated-blog"
+      },
+      "createdAt": "2026-10-31T00:17:27.920Z",
+      "lastRevealedAt": "2026-10-31T00:17:29.206Z",
+      "lastStatus": "complete",
+      "livemode": true,
+      "name": "voice-blog-site",
+      "providerId": "prvdr_61UXju1taz9UCvkk95GEK",
+      "providerName": "Netlify",
+      "resourceId": "fres_61VfnwTx5ezoccO6616Vfn5fHFA8yHCiDAKhU26IqD6u",
+      "serviceId": "project"
+    },
+    "voice-blog-tts": {
+      "configuration": {},
+      "createdAt": "2026-10-31T00:17:49.293Z",
+      "lastRevealedAt": "2026-10-31T00:17:52.382Z",
+      "lastStatus": "complete",
+      "livemode": true,
+      "name": "voice-blog-tts",
+      "providerId": "prvdr_61UYtnmm5DvySq8Ol56tE",
+      "providerName": "ElevenLabs",
+      "resourceId": "fres_61VfnwotHTtKiaHOO16Vfn5fHFA8yHCiDAKhU26Iq2zo",
+      "serviceId": "tts"
+    }
+  },
+  "managedProjectVariableEnvKeys": {
+    ".env": [
+      "ELEVENLABS_VOICE_ID",
+      "SESSION_SECRET",
+      "SITE_URL"
+    ]
+  }
+}

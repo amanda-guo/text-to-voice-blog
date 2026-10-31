@@ -1,0 +1,99 @@
+---
+import type { Post } from '../lib/config';
+const { post, audioUrl } = Astro.props as { post: Post; audioUrl: string };
+const duration = post.audio?.duration_sec;
+---
+<section class="audio-player" data-audio-player tabindex="0" aria-label={`Audio narration of ${post.title}`}>
+  <audio controls preload="none" src={audioUrl} data-audio></audio>
+  <div class="player-top">
+    <button class="play-button" type="button" data-play aria-label="Play narration">▶</button>
+    <div class="player-title"><strong>Listen to this post</strong><span data-time>{duration ? `0:00 / ${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : 'Audio narration'}</span></div>
+    <a class="download-link" href={audioUrl} download aria-label="Download audio">↓</a>
+  </div>
+  <div class="player-controls">
+    <button type="button" data-back aria-label="Back 15 seconds">−15</button>
+    <input type="range" min="0" max="100" value="0" step="0.1" data-seek aria-label="Seek audio" aria-valuetext="0 seconds" />
+    <button type="button" data-forward aria-label="Forward 30 seconds">+30</button>
+    <label class="sr-only" for={`speed-${post.id}`}>Playback speed</label>
+    <select id={`speed-${post.id}`} data-speed aria-label="Playback speed">
+      <option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+    </select>
+  </div>
+  <p class="resume-note" data-resume hidden></p>
+</section>
+<script>
+  const players = document.querySelectorAll<HTMLElement>('[data-audio-player]');
+  for (const player of players) {
+    const audio = player.querySelector<HTMLAudioElement>('[data-audio]')!;
+    const play = player.querySelector<HTMLButtonElement>('[data-play]')!;
+    const seek = player.querySelector<HTMLInputElement>('[data-seek]')!;
+    const timeLabel = player.querySelector<HTMLElement>('[data-time]')!;
+    const resume = player.querySelector<HTMLElement>('[data-resume]')!;
+    const speed = player.querySelector<HTMLSelectElement>('[data-speed]')!;
+    audio.removeAttribute('controls');
+    const file = new URL(audio.src).pathname.split('/').pop() || 'post';
+    const slug = file.replace(/-[a-f0-9]{8}\.mp3$/, '');
+    const positionKey = `audio-position:${slug}`;
+    const speedKey = 'audio-speed';
+    const fmt = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+    try { speed.value = localStorage.getItem(speedKey) || '1'; } catch {}
+    speed.addEventListener('change', () => {
+      audio.playbackRate = Number(speed.value);
+      try { localStorage.setItem(speedKey, speed.value); } catch {}
+    });
+    audio.playbackRate = Number(speed.value);
+    play.addEventListener('click', async () => {
+      if (audio.paused) {
+        document.querySelectorAll<HTMLAudioElement>('[data-audio]').forEach((other) => { if (other !== audio) other.pause(); });
+        await audio.play();
+      } else audio.pause();
+    });
+    player.querySelector('[data-back]')?.addEventListener('click', () => { audio.currentTime = Math.max(0, audio.currentTime - 15); });
+    player.querySelector('[data-forward]')?.addEventListener('click', () => { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 30); });
+    audio.addEventListener('play', () => { play.textContent = 'Ⅱ'; play.setAttribute('aria-label', 'Pause narration'); });
+    audio.addEventListener('pause', () => { play.textContent = '▶'; play.setAttribute('aria-label', 'Play narration'); });
+    audio.addEventListener('loadedmetadata', () => {
+      let saved = 0;
+      try { saved = Number(localStorage.getItem(positionKey) || 0); } catch {}
+      if (saved > 0 && saved < audio.duration - 5) {
+        resume.hidden = false;
+        resume.innerHTML = '';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = `Resume at ${fmt(saved)}`;
+        button.addEventListener('click', () => { audio.currentTime = saved; resume.hidden = true; });
+        resume.append(button);
+      }
+      update();
+    });
+    function update() {
+      const elapsed = audio.currentTime || 0;
+      const total = audio.duration || 0;
+      seek.value = total ? String((elapsed / total) * 100) : '0';
+      seek.setAttribute('aria-valuetext', `${fmt(elapsed)} of ${fmt(total)}`);
+      timeLabel.textContent = `${fmt(elapsed)} / ${fmt(total)}`;
+      if (total && Math.floor(elapsed) % 5 === 0) {
+        try { localStorage.setItem(positionKey, String(elapsed)); } catch {}
+      }
+    }
+    audio.addEventListener('timeupdate', update);
+    seek.addEventListener('input', () => { if (audio.duration) audio.currentTime = audio.duration * Number(seek.value) / 100; });
+    audio.addEventListener('ended', () => { try { localStorage.removeItem(positionKey); } catch {} });
+    player.addEventListener('keydown', (event) => {
+      if (event.code === 'Space' && event.target === player) {
+        event.preventDefault();
+        void play.click();
+      }
+    });
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: document.title, artist: document.querySelector('.brand')?.textContent || '', album: 'Blog' });
+      navigator.mediaSession.setActionHandler('play', () => { void audio.play(); });
+      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+      navigator.mediaSession.setActionHandler('seekbackward', () => { audio.currentTime = Math.max(0, audio.currentTime - 15); });
+      navigator.mediaSession.setActionHandler('seekforward', () => { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 30); });
+    }
+    const updateSticky = () => player.classList.toggle('is-sticky', player.getBoundingClientRect().bottom < 0);
+    window.addEventListener('scroll', updateSticky, { passive: true });
+    updateSticky();
+  }
+</script>

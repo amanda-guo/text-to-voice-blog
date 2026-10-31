@@ -1,0 +1,63 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AudioPlayer from '../../components/AudioPlayer.astro';
+import { config } from '../../lib/config';
+import { publishedPosts } from '../../lib/db';
+import { renderMarkdown } from '../../lib/markdown';
+
+export async function getStaticPaths() {
+  const posts = await publishedPosts();
+  return Promise.all(posts.map(async (post, index) => ({
+    params: { slug: post.slug },
+    props: {
+      post,
+      previous: posts[index + 1] ?? null,
+      next: posts[index - 1] ?? null,
+    },
+  })));
+}
+const { post, previous, next } = Astro.props as {
+  post: Awaited<ReturnType<typeof publishedPosts>>[number];
+  previous: Awaited<ReturnType<typeof publishedPosts>>[number] | null;
+  next: Awaited<ReturnType<typeof publishedPosts>>[number] | null;
+};
+const html = await renderMarkdown(post.body_md);
+const audioUrl = post.audio ? `/audio/${post.slug}-${post.audio.content_hash.slice(0, 8)}.mp3` : '';
+const publishedDate = post.published_at || post.created_at;
+const readingMinutes = Math.max(1, Math.ceil(post.body_md.trim().split(/\s+/).length / 220));
+const canonical = `${config.siteUrl}/posts/${post.slug}/`;
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.title,
+  description: post.excerpt || '',
+  datePublished: publishedDate,
+  dateModified: post.updated_at,
+  author: { '@type': 'Person', name: config.author },
+  mainEntityOfPage: canonical,
+  image: post.hero_image_url || undefined,
+  timeRequired: `PT${readingMinutes}M`,
+  audio: audioUrl ? { '@type': 'AudioObject', contentUrl: `${config.siteUrl}${audioUrl}`, encodingFormat: 'audio/mpeg', duration: post.audio?.duration_sec ? `PT${post.audio.duration_sec}S` : undefined } : undefined,
+};
+---
+<BaseLayout title={post.title} description={post.excerpt || config.description} canonical={canonical}>
+  <article>
+    <header class="article-header">
+      <p class="post-meta">
+        <time datetime={publishedDate}>{new Date(publishedDate).toLocaleDateString('en', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}</time>
+        <span>{readingMinutes} min read</span>
+        {post.tags.map((tag) => <a href={`/tags/${tag.slug}/`}>{tag.name}</a>)}
+      </p>
+      <h1>{post.title}</h1>
+      {post.excerpt && <p class="excerpt">{post.excerpt}</p>}
+      {post.hero_image_url && <img src={post.hero_image_url} alt={post.hero_image_alt || ''} fetchpriority="high" />}
+    </header>
+    {audioUrl && <AudioPlayer post={post} audioUrl={audioUrl} />}
+    <div class="article-body" set:html={html} />
+    <nav class="post-neighbors" aria-label="More posts">
+      {previous && <a href={`/posts/${previous.slug}/`}>← {previous.title}</a>}
+      {next && <a href={`/posts/${next.slug}/`}>{next.title} →</a>}
+    </nav>
+  </article>
+  <script type="application/ld+json" set:html={JSON.stringify(jsonLd).replace(/</g, '\\u003c')} />
+</BaseLayout>

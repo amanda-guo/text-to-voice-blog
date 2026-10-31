@@ -1,0 +1,38 @@
+{
+  "name": "voice-narrated-blog",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "netlify dev",
+    "astro": "astro",
+    "migrate": "tsx scripts/migrate.ts",
+    "seed": "tsx scripts/seed.ts",
+    "hash-password": "node scripts/hash-password.mjs",
+    "build": "npm run migrate && astro build",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.15",
+    "@netlify/blobs": "^10.5.0",
+    "astro": "^7.4.4",
+    "bcryptjs": "^3.0.2",
+    "dompurify": "^3.4.17",
+    "jose": "^6.1.0",
+    "marked": "^16.3.0",
+    "music-metadata": "^11.10.0",
+    "sanitize-html": "^2.17.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^6.0.3",
+    "@types/node": "^24.5.0",
+    "@types/sanitize-html": "^2.16.0",
+    "dotenv": "^17.2.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,28 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { config } from '../../lib/config';
+import { publishedPosts } from '../../lib/db';
+
+const pageSize = 10;
+const page = Number(Astro.params.page);
+const posts = (await publishedPosts()).slice((page - 1) * pageSize, page * pageSize);
+export async function getStaticPaths() {
+  const all = await publishedPosts();
+  return Array.from({ length: Math.max(0, Math.ceil(all.length / 10) - 1) }, (_, index) => ({
+    params: { page: String(index + 2) },
+    props: { totalPages: Math.ceil(all.length / 10) },
+  }));
+}
+const totalPages = Astro.props.totalPages as number;
+---
+<BaseLayout>
+  <section class="page-intro"><h1>Older writing</h1></section>
+  <section class="post-list" aria-label="Posts">
+    {posts.map((post) => <PostCard post={post} />)}
+  </section>
+  <nav class="pagination" aria-label="Pagination">
+    <a href={page === 2 ? '/' : `/page/${page - 1}/`}>← Newer posts</a>
+    {page < totalPages && <a href={`/page/${page + 1}/`}>Older posts →</a>}
+  </nav>
+</BaseLayout>

@@ -1,0 +1,87 @@
+{
+  "version": 2,
+  "providers": {
+    "elevenlabs": {
+      "name": "ElevenLabs"
+    },
+    "netlify": {
+      "name": "Netlify"
+    },
+    "turso": {
+      "name": "Turso"
+    }
+  },
+  "resources": {
+    "turso-plan": {
+      "livemode": true,
+      "name": "turso-plan",
+      "providerName": "Turso",
+      "serviceId": "starter"
+    },
+    "voice-blog-db": {
+      "livemode": true,
+      "name": "voice-blog-db",
+      "providerName": "Turso",
+      "serviceId": "database"
+    },
+    "voice-blog-site": {
+      "livemode": true,
+      "name": "voice-blog-site",
+      "providerName": "Netlify",
+      "serviceId": "project"
+    },
+    "voice-blog-tts": {
+      "livemode": true,
+      "name": "voice-blog-tts",
+      "providerName": "ElevenLabs",
+      "serviceId": "tts"
+    }
+  },
+  "environments": {
+    "default": {
+      "output": ".env",
+      "resources": [
+        {
+          "resourceName": "turso-plan"
+        },
+        {
+          "resourceName": "voice-blog-db"
+        },
+        {
+          "resourceName": "voice-blog-site"
+        },
+        {
+          "resourceName": "voice-blog-tts"
+        }
+      ],
+      "variables": [
+        {
+          "variableName": "voice-blog-narrator",
+          "envKey": "ELEVENLABS_VOICE_ID"
+        },
+        {
+          "variableName": "voice-blog-session-secret",
+          "envKey": "SESSION_SECRET"
+        },
+        {
+          "variableName": "voice-blog-site-url",
+          "envKey": "SITE_URL"
+        }
+      ]
+    }
+  },
+  "variables": {
+    "voice-blog-narrator": {
+      "name": "voice-blog-narrator",
+      "backendId": "fprjvar_61VfoDPSNfpprywN816Vfn5fHFA8yHCiDAKhU26IqBeS"
+    },
+    "voice-blog-session-secret": {
+      "name": "voice-blog-session-secret",
+      "backendId": "fprjvar_61VfoDxEHhosh5ihT16Vfn5fHFA8yHCiDAKhU26Iq6L2"
+    },
+    "voice-blog-site-url": {
+      "name": "voice-blog-site-url",
+      "backendId": "fprjvar_61VfoDmUDGlwUlML216Vfn5fHFA8yHCiDAKhU26IqNJI"
+    }
+  }
+}

@@ -1,0 +1,62 @@
+---
+import { config } from '../lib/config';
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  canonical?: string;
+  noindex?: boolean;
+}
+
+const { title = config.siteName, description = config.description, canonical, noindex = false } = Astro.props;
+const pageTitle = title === config.siteName ? title : `${title} — ${config.siteName}`;
+---
+<!doctype html>
+<html lang="en" style={`--accent: ${config.accent}`}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f5f1" />
+    <meta name="description" content={description} />
+    {canonical && <link rel="canonical" href={canonical} />}
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    {canonical && <meta property="og:url" content={canonical} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>{pageTitle}</title>
+    <script is:inline>
+      try {
+        const theme = localStorage.getItem('theme');
+        if (theme) document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="/">{config.siteName}</a>
+      <nav aria-label="Main navigation">
+        <a href="/">Writing</a>
+        <a href="/about/">About</a>
+        <button class="theme-toggle" type="button" aria-label="Toggle color theme">◐</button>
+      </nav>
+    </header>
+    <main id="main"><slot /></main>
+    <footer class="site-footer">
+      <p>© {new Date().getFullYear()} {config.author} · Read or listen.</p>
+      <a href="/rss.xml">RSS</a>
+    </footer>
+    <script>
+      const toggle = document.querySelector<HTMLButtonElement>('.theme-toggle');
+      toggle?.addEventListener('click', () => {
+        const current = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        try { localStorage.setItem('theme', next); } catch {}
+      });
+    </script>
+  </body>
+</html>

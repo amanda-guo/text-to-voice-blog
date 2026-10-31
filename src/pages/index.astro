@@ -1,0 +1,24 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostCard from '../components/PostCard.astro';
+import { config } from '../lib/config';
+import { publishedPosts } from '../lib/db';
+
+const posts = await publishedPosts();
+const pageSize = 10;
+const pagePosts = posts.slice(0, pageSize);
+---
+<BaseLayout title={config.siteName} canonical={`${config.siteUrl}/`}>
+  <section class="page-intro">
+    <h1>{config.siteName}</h1>
+    <p>{config.description}</p>
+  </section>
+  <section class="post-list" aria-label="Recent posts">
+    {pagePosts.length
+      ? pagePosts.map((post) => <PostCard post={post} />)
+      : <p class="empty-state">New writing is on its way.</p>}
+  </section>
+  {posts.length > pageSize && <nav class="pagination" aria-label="Pagination">
+    <span></span><a href="/page/2/">Older posts →</a>
+  </nav>}
+</BaseLayout>

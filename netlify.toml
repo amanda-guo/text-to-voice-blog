@@ -1,0 +1,39 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[functions."narrate-background"]
+  timeout = 900
+
+[functions."scheduled-publish"]
+  schedule = "*/15 * * * *"
+
+[[redirects]]
+  from = "/audio/*"
+  to = "/.netlify/functions/audio?path=:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/images/*"
+  to = "/.netlify/functions/image?path=:splat"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+
+[[headers]]
+  for = "/audio/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

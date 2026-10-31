@@ -1,0 +1,16 @@
+---
+import type { Post } from '../lib/config';
+
+const { post } = Astro.props as { post: Post };
+const words = post.body_md.trim().split(/\s+/).length;
+---
+<article class="post-card">
+  <p class="post-meta">
+    <time datetime={post.published_at || ''}>{post.published_at ? new Date(post.published_at).toLocaleDateString('en', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : ''}</time>
+    <span>{Math.max(1, Math.ceil(words / 220))} min read</span>
+    {post.audio?.duration_sec && <span>{Math.ceil(post.audio.duration_sec / 60)} min listen</span>}
+  </p>
+  <h2><a href={`/posts/${post.slug}/`}>{post.title}</a></h2>
+  {post.excerpt && <p>{post.excerpt}</p>}
+  {post.tags.length > 0 && <ul class="tag-list" aria-label="Tags">{post.tags.map((tag) => <li><a href={`/tags/${tag.slug}/`}>{tag.name}</a></li>)}</ul>}
+</article>

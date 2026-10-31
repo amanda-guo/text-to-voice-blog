@@ -1,0 +1,11 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { config } from '../lib/config';
+---
+<BaseLayout title="About" canonical={`${config.siteUrl}/about/`}>
+  <article class="narrow">
+    <h1>About</h1>
+    <p>{config.siteName} is written by {config.author}.</p>
+    <p>{config.description}</p>
+  </article>
+</BaseLayout>

@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { publishedPosts } from '../../lib/db';
+
+const posts = await publishedPosts();
+export async function getStaticPaths() {
+  const allPosts = await publishedPosts();
+  const tags = new Map(allPosts.flatMap((post) => post.tags.map((tag) => [tag.slug, tag.name] as const)));
+  return [...tags].map(([slug, name]) => ({ params: { tag: slug }, props: { name } }));
+}
+const tagSlug = Astro.params.tag!;
+const name = Astro.props.name as string;
+const taggedPosts = posts.filter((post) => post.tags.some((tag) => tag.slug === tagSlug));
+---
+<BaseLayout title={`Posts tagged ${name}`}>
+  <section class="page-intro"><h1>Posts tagged “{name}”</h1></section>
+  <section class="post-list" aria-label={`Posts tagged ${name}`}>
+    {taggedPosts.map((post) => <PostCard post={post} />)}
+  </section>
+</BaseLayout>
